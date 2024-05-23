@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	ctxTimeout, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctxTimeout, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
 	client := &http.Client{}
