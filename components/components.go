@@ -18,10 +18,6 @@ const (
 	urlEconomia = "https://economia.awesomeapi.com.br/json/last/USD-BRL"
 )
 
-type Root struct {
-	USDBRL USDBRL `json:"USDBRL"`
-}
-
 type USDBRL struct {
 	Code       string `json:"code"`
 	Codein     string `json:"codein"`
@@ -50,7 +46,7 @@ func getRequest(ctx context.Context, url string) (*http.Response, error) {
 		var netErr net.Error
 		ok := errors.As(err, &netErr)
 		if ok && netErr.Timeout() {
-			log.Printf("Request to %s timed out", url)
+			log.Fatalf("Request to %s timed out", url)
 		}
 		return nil, err
 	}
@@ -66,21 +62,26 @@ func Client(ctx context.Context, port string) {
 		log.Fatal(err)
 	}
 
-	root := &Root{}
+	root := &struct {
+		Bid string `json:"bid"`
+	}{}
+
 	if err = json.NewDecoder(data.Body).Decode(root); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := os.WriteFile("cotacao.txt", []byte(root.USDBRL.Bid), 0644); err != nil {
+	result := fmt.Sprintf("Dólar:%s", root.Bid)
+
+	if err = os.WriteFile("cotacao.txt", []byte(result), 0644); err != nil {
 		var netErr net.Error
 		ok := errors.As(err, &netErr)
 		if ok && netErr.Timeout() {
-			log.Printf("Save file operation timed out")
+			log.Fatalf("Save file operation timed out")
 		}
 		log.Fatal(err)
 	}
 
-	log.Printf("File cotacao.txt saved with bid %s", root.USDBRL.Bid)
+	log.Printf("File cotacao.txt saved with bid %s", root.Bid)
 }
 
 func Server(ctx context.Context, port, filePath string) {
@@ -96,6 +97,7 @@ func Server(ctx context.Context, port, filePath string) {
 
 	http.HandleFunc("GET /cotacao", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Request received")
+		w.Header().Set("Content-Type", "application/json")
 		data, err := getRequest(ctx, urlEconomia)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -103,7 +105,10 @@ func Server(ctx context.Context, port, filePath string) {
 			return
 		}
 
-		root := &Root{}
+		root := &struct {
+			USDBRL USDBRL `json:"USDBRL"`
+		}{}
+
 		if err = json.NewDecoder(data.Body).Decode(root); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
